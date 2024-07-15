@@ -26,6 +26,7 @@ IMAGE_REGISTRY ?= gcr.io/k8s-staging-lws
 IMAGE_NAME := lws
 IMAGE_REPO := $(IMAGE_REGISTRY)/$(IMAGE_NAME)
 IMG ?= $(IMAGE_REPO):$(GIT_TAG)
+CHART_NAME ?= lws
 
 # Use distroless as minimal base image to package the manager binary
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
@@ -293,4 +294,13 @@ toc-verify:
 .PHONY: generate-apiref
 generate-apiref: genref
 	cd $(PROJECT_DIR)/hack/genref/ && $(GENREF) -o $(PROJECT_DIR)/docs/reference
-	
+
+HELMIFY ?= $(LOCALBIN)/helmify
+
+.PHONY: helmify
+helmify: $(HELMIFY) ## Download helmify locally if necessary.
+$(HELMIFY): $(LOCALBIN)
+	test -s $(LOCALBIN)/helmify || GOBIN=$(LOCALBIN) go install github.com/arttor/helmify/cmd/helmify@latest
+
+helm: manifests kustomize helmify
+	rm -rf ./charts/$(CHART_NAME) && $(KUSTOMIZE) build config/default | $(HELMIFY) -crd-dir ./charts/$(CHART_NAME)
